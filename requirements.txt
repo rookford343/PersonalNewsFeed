@@ -1,0 +1,20 @@
+# Personal News Feed Requirements
+# Install with: pip install -r requirements.txt
+
+feedparser==6.0.10
+requests==2.31.0
+sqlite3  # Built into Python
+smtplib  # Built into Python
+email    # Built into Python
+
+# Optional: For future LLM integration
+# transformers==4.33.2
+# torch==2.0.1
+# sentence-transformers==2.2.2
+
+# Optional: For better HTML parsing
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Optional: For scheduling
+schedule==1.2.0

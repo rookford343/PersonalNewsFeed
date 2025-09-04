@@ -1,0 +1,203 @@
+# Personal AI News Feed - Git Ignore
+
+# Database files - contains personal news data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Generated reports - may contain personal reading preferences
+news_report_*.html
+news_digest_*.html
+*.html
+
+# Log files - may contain personal activity patterns
+*.log
+logs/
+*.log.*
+
+# Configuration files with personal preferences
+# config.json  # Uncomment to ignore personal config customizations
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+news_env/
+.venv
+.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Configuration files with sensitive data
+secrets.json
+smtp_config.py
+email_config.py
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Cache directories
+.cache/
+*.cache
+
+# Local testing and development
+test_*.py
+debug_*.py
+scratch/
+temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security-sensitive files
+*.key
+*.pem
+*.cert
+*.crt
+credentials.*
+auth.*
+
+# User-specific customizations
+user_sources.json
+custom_feeds.json
+personal_config.py# Personal AI News Feed - Git Ignore
+
+# Database files - contains personal news data
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Generated reports - may contain personal reading preferences
+news_report_*.html
+news_digest_*.html
+*.html
+
+# Log files - may contain personal activity patterns
+*.log
+logs/
+*.log.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+news_env/
+.venv
+.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Configuration files with sensitive data
+config.json
+secrets.json
+smtp_config.py
+email_config.py
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+
+# Cache directories
+.cache/
+*.cache
+
+# Local testing and development
+test_*.py
+debug_*.py
+scratch/
+temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security-sensitive files
+*.key
+*.pem
+*.cert
+*.crt
+credentials.*
+auth.*
+
+# User-specific news sources (if implemented as separate config)
+user_sources.json
+custom_feeds.json
+personal_config.py

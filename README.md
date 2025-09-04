@@ -1,4 +1,4 @@
-# Personal AI News Feed
+# Personal News Feed
 
 A security-focused, privacy-first news aggregation and summarization system that runs entirely on your local machine. Built for security professionals who need quick, categorized news digests without compromising data privacy.
 
