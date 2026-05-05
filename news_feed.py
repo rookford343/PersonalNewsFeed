@@ -665,30 +665,129 @@ class EmailReporter:
         self.config = config
         self.credential_manager = SecureCredentialManager()
     
-    def generate__report(self, articles: List[NewsArticle]) -> str:
-        """Generate  HTML report with improved layout"""
-        # Group articles by category and importance
-        categorized = {}
-        high_importance = []
-        duplicate_groups = {}
+    def generate_enhanced_report(self, articles: List[NewsArticle]) -> str:
+        """Generate enhanced HTML report with working navigation and proper category ordering"""
+        
+        # Define category configuration with your preferred order and consolidated sections
+        category_config = {
+            'critical_alerts': {
+                'title': '🚨 Critical News & Alerts',
+                'color': '#e74c3c',
+                'priority': 1,
+                'description': 'Breaking news, security alerts, and high-priority updates',
+                'source_categories': ['government_alerts', 'breaking_news']
+            },
+            'world': {
+                'title': '🌍 World News',
+                'color': '#34495e',
+                'priority': 2,
+                'description': 'International developments and global security context',
+                'source_categories': ['world_news', 'world']
+            },
+            'united_states': {
+                'title': '🇺🇸 United States News',
+                'color': '#16a085',
+                'priority': 3,
+                'description': 'National politics, policy, and domestic developments',
+                'source_categories': ['united_states', 'usa', 'national']
+            },
+            'local': {
+                'title': '📍 Local & Regional News',
+                'color': '#95a5a6',
+                'priority': 4,
+                'description': 'Indianapolis area, Indiana, and Midwest regional news',
+                'source_categories': ['local_midwest', 'local', 'indiana', 'midwest']
+            },
+            'cybersecurity': {
+                'title': '🔒 Cybersecurity & Threat Intelligence',
+                'color': '#c0392b',
+                'priority': 5,
+                'description': 'Security alerts, vulnerabilities, threat analysis, and incident response',
+                'source_categories': ['cybersecurity', 'threat_intelligence', 'security']
+            },
+            'technology': {
+                'title': '💻 Technology & Innovation',
+                'color': '#3498db',
+                'priority': 6,
+                'description': 'Tech trends, innovations, and industry developments',
+                'source_categories': ['technology', 'tech', 'innovation']
+            },
+            'electric_vehicles': {
+                'title': '🔋 Electric Vehicles & Clean Energy',
+                'color': '#2ecc71',
+                'priority': 7,
+                'description': 'EV market, charging infrastructure, and clean energy policy',
+                'source_categories': ['electric_vehicles', 'clean_energy', 'ev']
+            },
+            'critical_infrastructure': {
+                'title': '⚡ Critical Infrastructure & Power Grid',
+                'color': '#f39c12',
+                'priority': 8,
+                'description': 'Power industry, grid security, and infrastructure news',
+                'source_categories': ['critical_infrastructure', 'power_grid', 'infrastructure']
+            }
+        }
+        
+        # Consolidate articles into the new category structure
+        consolidated_categories = {}
         
         for article in articles:
-            # Group by category
-            if article.category not in categorized:
-                categorized[article.category] = []
-            categorized[article.category].append(article)
+            # Find which consolidated category this article belongs to
+            assigned_category = None
             
-            # High importance articles (score > 50)
-            if article.importance_score > 50:
-                high_importance.append(article)
+            # Check if it's a critical alert first
+            if (article.importance_score > 75 and 
+                article.category in ['cybersecurity', 'critical_infrastructure', 'government_alerts']):
+                assigned_category = 'critical_alerts'
+            else:
+                # Find matching category based on source categories
+                for cat_key, cat_config in category_config.items():
+                    if article.category in cat_config['source_categories']:
+                        assigned_category = cat_key
+                        break
+                
+                # Fallback - try partial matching
+                if not assigned_category:
+                    article_cat_lower = article.category.lower()
+                    for cat_key, cat_config in category_config.items():
+                        for source_cat in cat_config['source_categories']:
+                            if source_cat in article_cat_lower or article_cat_lower in source_cat:
+                                assigned_category = cat_key
+                                break
+                        if assigned_category:
+                            break
+            
+            # Default category if no match found
+            if not assigned_category:
+                if 'cyber' in article.category.lower() or 'security' in article.category.lower():
+                    assigned_category = 'cybersecurity'
+                elif 'local' in article.category.lower() or 'midwest' in article.category.lower():
+                    assigned_category = 'local'
+                else:
+                    assigned_category = 'technology'  # Default fallback
+            
+            if assigned_category not in consolidated_categories:
+                consolidated_categories[assigned_category] = []
+            consolidated_categories[assigned_category].append(article)
         
-        # Get duplicate groups if enabled
-        if self.config.config.get("report", {}).get("highlight_duplicates", True):
-            db = NewsDatabase(self.config)
-            duplicate_groups = db.get_duplicate_groups(24)
+        # Calculate statistics
+        total_articles = len(articles)
+        high_importance = [a for a in articles if a.importance_score > 50]
+        critical_alerts = [a for a in articles if a.importance_score > 75]
+        categories_with_content = len([cat for cat in consolidated_categories if consolidated_categories[cat]])
         
-        # Generate report
-        report_title = self.config.config.get("report", {}).get("title", " Personal News Digest")
+        # Sort categories by priority and filter out empty ones
+        sorted_categories = []
+        for cat_key in sorted(category_config.keys(), key=lambda x: category_config[x]['priority']):
+            if cat_key in consolidated_categories and consolidated_categories[cat_key]:
+                sorted_categories.append((cat_key, consolidated_categories[cat_key]))
+        
+        # Generate navigation menu
+        nav_items = []
+        for category, cat_articles in sorted_categories:
+            config = category_config[category]
+            nav_items.append(f'<a href="#{category}" class="nav-link">{config["title"]} ({len(cat_articles)})</a>')
+        
         report_date = datetime.now().strftime("%A, %B %d, %Y")
         
         html_content = f"""
@@ -697,329 +796,572 @@ class EmailReporter:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{report_title}</title>
+            <title>Personal News Feed</title>
             <style>
+                * {{
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }}
+                
                 body {{ 
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     line-height: 1.6;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    background-color: #f8f9fa;
+                    background: #f8f9fa;
+                    color: #333;
                 }}
-                .header {{ 
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 30px;
-                    border-radius: 10px;
-                    margin-bottom: 30px;
-                    text-align: center;
-                }}
-                .header h1 {{ margin: 0; font-size: 2.2em; }}
-                .header .subtitle {{ margin-top: 10px; opacity: 0.9; }}
                 
-                .summary-stats {{
+                .container {{
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    background: white;
+                    min-height: 100vh;
+                }}
+                
+                .header {{ 
+                    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+                    color: white;
+                    padding: 2rem;
+                    text-align: center;
+                    position: sticky;
+                    top: 0;
+                    z-index: 1000;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                
+                .header h1 {{ 
+                    font-size: 2.5em; 
+                    font-weight: 300; 
+                    margin-bottom: 0.5rem;
+                }}
+                
+                .header .subtitle {{ 
+                    font-size: 1.1em;
+                    opacity: 0.9;
+                    margin-bottom: 1rem;
+                }}
+                
+                .header .location {{ 
+                    font-size: 0.9em;
+                    opacity: 0.8;
+                }}
+                
+                .navigation {{
+                    background: #34495e;
+                    padding: 1rem 2rem;
+                    overflow-x: auto;
+                    white-space: nowrap;
+                    border-bottom: 1px solid #2c3e50;
+                }}
+                
+                .nav-link {{
+                    display: inline-block;
+                    color: #ecf0f1;
+                    text-decoration: none;
+                    padding: 0.5rem 1rem;
+                    margin-right: 1rem;
+                    border-radius: 6px;
+                    font-size: 0.9em;
+                    transition: all 0.3s ease;
+                    cursor: pointer;
+                }}
+                
+                .nav-link:hover {{
+                    background: #3498db;
+                    color: white;
+                }}
+                
+                .dashboard {{
+                    padding: 2rem;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                }}
+                
+                .stats-grid {{
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 30px;
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
                 }}
+                
                 .stat-card {{
                     background: white;
-                    padding: 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    padding: 1.5rem;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
                     text-align: center;
+                    transition: transform 0.3s ease;
+                    border-left: 4px solid #3498db;
                 }}
-                .stat-number {{ font-size: 2em; font-weight: bold; color: #667eea; }}
-                .stat-label {{ color: #666; margin-top: 5px; }}
+                
+                .stat-card:hover {{ 
+                    transform: translateY(-2px); 
+                    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+                }}
+                
+                .stat-number {{ 
+                    font-size: 2.5em; 
+                    font-weight: bold; 
+                    margin-bottom: 0.5rem;
+                    color: #2c3e50;
+                }}
+                
+                .stat-label {{ 
+                    color: #7f8c8d; 
+                    font-size: 0.9em;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }}
                 
                 .section {{
-                    background: white;
-                    margin: 30px 0;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-                    overflow: hidden;
+                    margin: 0;
+                    border-bottom: 1px solid #ecf0f1;
                 }}
-                .section-header {{
-                    background: #667eea;
-                    color: white;
-                    padding: 20px;
-                    font-size: 1.4em;
-                    font-weight: bold;
-                }}
-                .section-content {{ padding: 20px; }}
                 
-                .article {{
-                    margin: 20px 0;
-                    padding: 20px;
-                    border-left: 4px solid #ddd;
-                    background: #fafafa;
-                    border-radius: 0 8px 8px 0;
+                .section-header {{
+                    padding: 1.5rem 2rem;
+                    font-size: 1.4em;
+                    font-weight: 600;
+                    color: white;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
                     transition: all 0.3s ease;
                 }}
-                .article:hover {{ transform: translateX(5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }}
                 
-                .high-importance {{ border-left-color: #e74c3c; background: #fdf2f2; }}
-                .medium-importance {{ border-left-color: #f39c12; background: #fef9f3; }}
-                .fact {{ border-left-color: #27ae60; }}
-                .speculation {{ border-left-color: #e74c3c; }}
-                .mixed {{ border-left-color: #f39c12; }}
-                .neutral {{ border-left-color: #95a5a6; }}
+                .section-header:hover {{
+                    opacity: 0.9;
+                }}
+                
+                .section-title {{
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.25rem;
+                }}
+                
+                .section-description {{
+                    font-size: 0.8em;
+                    opacity: 0.9;
+                    font-weight: 300;
+                }}
+                
+                .section-controls {{
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }}
+                
+                .article-count {{
+                    background: rgba(255,255,255,0.2);
+                    padding: 0.25rem 0.75rem;
+                    border-radius: 15px;
+                    font-size: 0.8em;
+                }}
+                
+                .toggle-btn {{
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 1.2em;
+                    cursor: pointer;
+                    padding: 0.25rem;
+                    border-radius: 4px;
+                    transition: background 0.3s ease;
+                }}
+                
+                .toggle-btn:hover {{
+                    background: rgba(255,255,255,0.1);
+                }}
+                
+                .section-content {{ 
+                    padding: 2rem;
+                    background: white;
+                    display: none;
+                }}
+                
+                .section-content.expanded {{
+                    display: block;
+                }}
+                
+                .article {{
+                    margin: 1.5rem 0;
+                    padding: 1.5rem;
+                    background: #fafafa;
+                    border-radius: 12px;
+                    border-left: 4px solid #ddd;
+                    transition: all 0.3s ease;
+                }}
+                
+                .article:hover {{ 
+                    transform: translateX(5px); 
+                    box-shadow: 0 6px 20px rgba(0,0,0,0.1); 
+                    background: white;
+                }}
+                
+                .critical-alert {{ 
+                    border-left-color: #e74c3c; 
+                    background: linear-gradient(135deg, #fdf2f2 0%, #fef5f5 100%);
+                    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.1);
+                }}
+                
+                .high-importance {{ 
+                    border-left-color: #f39c12; 
+                    background: linear-gradient(135deg, #fef9f3 0%, #fffbf0 100%);
+                }}
+                
+                .medium-importance {{ 
+                    border-left-color: #3498db; 
+                    background: linear-gradient(135deg, #f0f8ff 0%, #f8fbff 100%);
+                }}
                 
                 .article-header {{
                     display: flex;
                     justify-content: space-between;
                     align-items: flex-start;
-                    margin-bottom: 15px;
+                    margin-bottom: 1rem;
+                    gap: 1rem;
                 }}
+                
                 .article-title {{
                     font-size: 1.3em;
-                    font-weight: bold;
+                    font-weight: 600;
                     margin: 0;
+                    flex: 1;
                 }}
+                
                 .article-title a {{
                     color: #2c3e50;
                     text-decoration: none;
+                    transition: color 0.3s ease;
                 }}
-                .article-title a:hover {{ color: #667eea; }}
+                
+                .article-title a:hover {{ 
+                    color: #3498db; 
+                }}
                 
                 .importance-badge {{
-                    background: #667eea;
-                    color: white;
-                    padding: 4px 12px;
+                    padding: 0.4rem 0.8rem;
                     border-radius: 20px;
-                    font-size: 0.8em;
-                    font-weight: bold;
+                    font-size: 0.75em;
+                    font-weight: 600;
                     white-space: nowrap;
                 }}
-                .high-importance .importance-badge {{ background: #e74c3c; }}
-                .medium-importance .importance-badge {{ background: #f39c12; }}
+                
+                .critical-badge {{ background: #e74c3c; color: white; }}
+                .high-badge {{ background: #f39c12; color: white; }}
+                .medium-badge {{ background: #3498db; color: white; }}
+                .normal-badge {{ background: #95a5a6; color: white; }}
                 
                 .article-meta {{
-                    color: #666;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                    color: #7f8c8d;
                     font-size: 0.9em;
-                    margin-bottom: 10px;
+                    margin-bottom: 1rem;
+                    align-items: center;
                 }}
-                .article-summary {{ margin-bottom: 15px; }}
                 
-                .highlights {{
-                    background: #f8f9ff;
-                    border: 1px solid #e1e8ff;
-                    border-radius: 6px;
-                    padding: 15px;
-                    margin: 15px 0;
-                }}
-                .highlights-title {{
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                    color: #667eea;
-                }}
-                .highlight-item {{
-                    margin: 8px 0;
-                    padding: 8px 0;
-                    border-bottom: 1px solid #eee;
-                }}
-                .highlight-item:last-child {{ border-bottom: none; }}
-                
-                .duplicate-notice {{
-                    background: #fff3cd;
-                    border: 1px solid #ffeaa7;
-                    border-radius: 6px;
-                    padding: 10px;
-                    margin: 10px 0;
-                    font-size: 0.9em;
+                .meta-item {{
+                    display: flex;
+                    align-items: center;
+                    gap: 0.25rem;
                 }}
                 
                 .analysis-tag {{
-                    display: inline-block;
-                    padding: 3px 8px;
+                    padding: 0.25rem 0.6rem;
                     border-radius: 12px;
-                    font-size: 0.8em;
-                    font-weight: bold;
-                    margin-right: 10px;
+                    font-size: 0.75em;
+                    font-weight: 500;
                 }}
+                
                 .factual {{ background: #d4edda; color: #155724; }}
                 .speculation {{ background: #f8d7da; color: #721c24; }}
                 .mixed {{ background: #fff3cd; color: #856404; }}
                 .neutral {{ background: #e2e3e5; color: #383d41; }}
                 
+                .article-summary {{ 
+                    margin-bottom: 1rem;
+                    color: #555;
+                    line-height: 1.7;
+                }}
+                
+                .show-more-btn {{
+                    background: #3498db;
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 0.9em;
+                    margin: 1rem auto;
+                    display: block;
+                    transition: all 0.3s ease;
+                }}
+                
+                .show-more-btn:hover {{
+                    background: #2980b9;
+                    transform: translateY(-1px);
+                }}
+                
                 .footer {{
+                    background: #2c3e50;
+                    color: white;
                     text-align: center;
-                    padding: 30px;
-                    color: #666;
-                    border-top: 1px solid #eee;
-                    margin-top: 40px;
+                    padding: 2rem;
+                }}
+                
+                .footer-links {{
+                    margin-top: 1rem;
+                }}
+                
+                .footer-links a {{
+                    color: #3498db;
+                    text-decoration: none;
+                    margin: 0 1rem;
                 }}
                 
                 @media (max-width: 768px) {{
-                    body {{ padding: 10px; }}
-                    .header {{ padding: 20px; }}
+                    .header {{ padding: 1rem; }}
+                    .navigation {{ padding: 1rem; }}
+                    .dashboard {{ padding: 1rem; }}
+                    .section-content {{ padding: 1rem; }}
+                    .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
                     .article-header {{ flex-direction: column; align-items: flex-start; }}
-                    .importance-badge {{ margin-top: 10px; }}
+                    .nav-link {{ margin-bottom: 0.5rem; }}
                 }}
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>{report_title}</h1>
-                <div class="subtitle">{report_date}</div>
-            </div>
-            
-            <div class="summary-stats">
-                <div class="stat-card">
-                    <div class="stat-number">{len(articles)}</div>
-                    <div class="stat-label">Total Articles</div>
+            <div class="container">
+                <div class="header">
+                    <h1>Personal News Feed</h1>
+                    <div class="subtitle">{report_date}</div>
+                    <div class="location">📍 Westfield, Indiana</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-number">{len(high_importance)}</div>
-                    <div class="stat-label">High Priority</div>
+                
+                <div class="navigation">
+                    {''.join(nav_items)}
                 </div>
-                <div class="stat-card">
-                    <div class="stat-number">{len(categorized)}</div>
-                    <div class="stat-label">Categories</div>
+                
+                <div class="dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number">{total_articles}</div>
+                            <div class="stat-label">Total Articles</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{len(critical_alerts)}</div>
+                            <div class="stat-label">Critical Alerts</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{len(high_importance)}</div>
+                            <div class="stat-label">High Priority</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{categories_with_content}</div>
+                            <div class="stat-label">Categories</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-number">{len(duplicate_groups)}</div>
-                    <div class="stat-label">Breaking Stories</div>
-                </div>
-            </div>
         """
         
-        # High importance articles section
-        if high_importance:
-            html_content += """
-            <div class="section">
-                <div class="section-header">🚨 High Priority News</div>
-                <div class="section-content">
-            """
-            
-            for article in sorted(high_importance, key=lambda x: x.importance_score, reverse=True)[:10]:
-                html_content += self._format_article(article, is_priority=True)
-            
-            html_content += "</div></div>"
-        
-        # Breaking stories (duplicate groups)
-        if duplicate_groups:
-            html_content += """
-            <div class="section">
-                <div class="section-header">📈 Breaking Stories (Multiple Sources)</div>
-                <div class="section-content">
-            """
-            
-            for group_id, group_articles in duplicate_groups.items():
-                if len(group_articles) > 1:
-                    # Sort by importance and take the best one
-                    primary_article = max(group_articles, key=lambda x: x.importance_score)
-                    other_sources = [a.source for a in group_articles if a != primary_article]
-                    
-                    html_content += f"""
-                    <div class="duplicate-notice">
-                        <strong>📊 Covered by {len(group_articles)} sources:</strong> 
-                        {', '.join(set(other_sources))}
-                    </div>
-                    """
-                    html_content += self._format_article(primary_article, is_breaking=True)
-            
-            html_content += "</div></div>"
-        
-        # Articles by category
-        for category, cat_articles in categorized.items():
+        # Generate category sections in the specified order
+        for category, cat_articles in sorted_categories:
             if not cat_articles:
                 continue
             
+            config = category_config[category]
+            
             # Sort by importance
             cat_articles.sort(key=lambda x: x.importance_score, reverse=True)
-            max_articles = self.config.config.get("report", {}).get("max_articles_per_category", 20)
-            cat_articles = cat_articles[:max_articles]
             
-            category_name = category.title().replace('_', ' ')
+            # Show top 3 articles by default
+            top_articles = cat_articles[:3]
+            remaining_articles = cat_articles[3:]
+            
             html_content += f"""
-            <div class="section">
-                <div class="section-header">📰 {category_name} ({len(cat_articles)} articles)</div>
-                <div class="section-content">
+            <div class="section" id="{category}">
+                <div class="section-header" style="background: linear-gradient(135deg, {config['color']} 0%, {config['color']}dd 100%);" onclick="toggleSection('{category}')">
+                    <div class="section-title">
+                        <div>{config['title']}</div>
+                        <div class="section-description">{config['description']}</div>
+                    </div>
+                    <div class="section-controls">
+                        <div class="article-count">{len(cat_articles)} articles</div>
+                        <button class="toggle-btn" id="toggle-{category}">▼</button>
+                    </div>
+                </div>
+                <div class="section-content" id="content-{category}">
             """
             
-            for article in cat_articles:
-                html_content += self._format_article(article)
+            # Top articles
+            for article in top_articles:
+                html_content += self._format_enhanced_article(article)
+            
+            # Show more button and remaining articles
+            if remaining_articles:
+                html_content += f"""
+                    <button class="show-more-btn" onclick="showMore('{category}')" id="showmore-{category}">
+                        Show {len(remaining_articles)} more articles...
+                    </button>
+                    <div id="more-{category}" style="display: none;">
+                """
+                
+                for article in remaining_articles:
+                    html_content += self._format_enhanced_article(article)
+                
+                html_content += "</div>"
             
             html_content += "</div></div>"
         
-        # Footer
+        # Add JavaScript and footer
         html_content += f"""
-            <div class="footer">
-                <p>Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}</p>
-                <p>Personal AI News Aggregator v3.0 - Secure Local Processing</p>
+                <div class="footer">
+                    <div>Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')} EST</div>
+                    <div style="margin-top: 0.5rem; font-size: 0.9em; opacity: 0.8;">
+                        Personal News Aggregator v3.0 | Secure Local Processing
+                    </div>
+                    <div class="footer-links">
+                        <a href="#top">Back to Top</a>
+                        <a href="mailto:support@example.com">Report Issues</a>
+                    </div>
+                </div>
             </div>
+            
+            <script>
+                // Toggle section visibility
+                function toggleSection(sectionId) {{
+                    const content = document.getElementById('content-' + sectionId);
+                    const toggle = document.getElementById('toggle-' + sectionId);
+                    
+                    if (content.classList.contains('expanded')) {{
+                        content.classList.remove('expanded');
+                        toggle.textContent = '▼';
+                    }} else {{
+                        content.classList.add('expanded');
+                        toggle.textContent = '▲';
+                    }}
+                }}
+                
+                // Show more articles in a category
+                function showMore(sectionId) {{
+                    const moreContent = document.getElementById('more-' + sectionId);
+                    const button = document.getElementById('showmore-' + sectionId);
+                    
+                    if (moreContent.style.display === 'none') {{
+                        moreContent.style.display = 'block';
+                        button.textContent = 'Show fewer articles';
+                    }} else {{
+                        moreContent.style.display = 'none';
+                        const count = moreContent.children.length;
+                        button.textContent = `Show ${{count}} more articles...`;
+                    }}
+                }}
+                
+                // Fixed navigation - smooth scrolling for navigation links
+                document.addEventListener('DOMContentLoaded', function() {{
+                    document.querySelectorAll('.nav-link').forEach(link => {{
+                        link.addEventListener('click', function(e) {{
+                            e.preventDefault();
+                            const href = this.getAttribute('href');
+                            if (href && href.startsWith('#')) {{
+                                const targetId = href.substring(1);
+                                const target = document.getElementById(targetId);
+                                
+                                if (target) {{
+                                    // Expand the section if it's not already expanded
+                                    const content = document.getElementById('content-' + targetId);
+                                    if (content && !content.classList.contains('expanded')) {{
+                                        toggleSection(targetId);
+                                    }}
+                                    
+                                    // Smooth scroll to section with offset for fixed header
+                                    setTimeout(() => {{
+                                        const headerHeight = document.querySelector('.header').offsetHeight;
+                                        const targetPosition = target.offsetTop - headerHeight - 20;
+                                        window.scrollTo({{
+                                            top: targetPosition,
+                                            behavior: 'smooth'
+                                        }});
+                                    }}, 100);
+                                }}
+                            }}
+                        }});
+                    }});
+                    
+                    // Auto-expand high-priority sections
+                    const prioritySections = ['critical_alerts', 'cybersecurity'];
+                    prioritySections.forEach(sectionId => {{
+                        const element = document.getElementById(sectionId);
+                        if (element) {{
+                            toggleSection(sectionId);
+                        }}
+                    }});
+                }});
+            </script>
         </body>
         </html>
         """
         
         return html_content
     
-    def _format_article(self, article: NewsArticle, is_priority: bool = False, is_breaking: bool = False) -> str:
-        """Format individual article HTML"""
-        # Determine importance class
-        importance_class = ""
-        importance_label = ""
+    def _format_enhanced_article(self, article: NewsArticle, is_critical: bool = False, is_breaking: bool = False) -> str:
+        """Format individual article with clean styling"""
+        # Determine styling
+        article_classes = ["article"]
+        badge_class = "normal-badge"
+        badge_text = "NORMAL"
         
-        if article.importance_score > 75:
-            importance_class = "high-importance"
-            importance_label = "HIGH"
-        elif article.importance_score > 40:
-            importance_class = "medium-importance"
-            importance_label = "MEDIUM"
-        else:
-            importance_label = "NORMAL"
+        if is_critical or article.importance_score > 75:
+            article_classes.append("critical-alert")
+            badge_class = "critical-badge"
+            badge_text = "CRITICAL"
+        elif article.importance_score > 50:
+            article_classes.append("high-importance")
+            badge_class = "high-badge"
+            badge_text = "HIGH"
+        elif article.importance_score > 25:
+            article_classes.append("medium-importance")
+            badge_class = "medium-badge"
+            badge_text = "MEDIUM"
         
-        # Analysis class
         analysis_class = article.fact_speculation_analysis.lower()
-        
-        # Format published time
         time_ago = self._time_ago(article.published)
         
         html = f"""
-        <div class="article {importance_class} {analysis_class}">
+        <div class="{' '.join(article_classes)}">
             <div class="article-header">
                 <h3 class="article-title">
-                    <a href="{article.url}" target="_blank">{article.title}</a>
+                    <a href="{article.url}" target="_blank" rel="noopener noreferrer">
+                        {article.title}
+                    </a>
                 </h3>
-                <span class="importance-badge">{importance_label} ({article.importance_score})</span>
+                <span class="importance-badge {badge_class}">
+                    {badge_text}
+                </span>
             </div>
             
             <div class="article-meta">
-                <strong>Source:</strong> {article.source} | 
-                <strong>Published:</strong> {time_ago} |
-                <span class="analysis-tag {analysis_class}">{article.fact_speculation_analysis}</span>
+                <div class="meta-item">
+                    <span>🏢</span>
+                    <strong>{article.source}</strong>
+                </div>
+                <div class="meta-item">
+                    <span>⏰</span>
+                    {time_ago}
+                </div>
+                <div class="analysis-tag {analysis_class}">
+                    {article.fact_speculation_analysis}
+                </div>
+            </div>
+            
+            <div class="article-summary">{article.summary}</div>
+        </div>
         """
         
-        if article.author:
-            html += f" | <strong>Author:</strong> {article.author}"
-        
-        html += "</div>"
-        
-        # Article summary
-        if article.summary:
-            html += f'<div class="article-summary">{article.summary}</div>'
-        
-        # Key highlights
-        if article.key_highlights:
-            html += """
-            <div class="highlights">
-                <div class="highlights-title">🔍 Key Highlights:</div>
-            """
-            for highlight in article.key_highlights:
-                html += f'<div class="highlight-item">• {highlight}</div>'
-            html += "</div>"
-        
-        # Full content preview if available
-        if article.full_content and self.config.config.get("report", {}).get("show_full_content", False):
-            preview = article.full_content[:500] + "..." if len(article.full_content) > 500 else article.full_content
-            html += f'<div class="full-content-preview"><strong>Preview:</strong> {preview}</div>'
-        
-        html += "</div>"
         return html
-    
+
     def _time_ago(self, published: datetime) -> str:
         """Format time ago string"""
         now = datetime.now()
@@ -1178,7 +1520,7 @@ class NewsAggregator:
             return
         
         # Generate  report
-        report_content = self.reporter.generate__report(recent_articles)
+        report_content = self.reporter.generate_enhanced_report(recent_articles)
         
         # Save report
         self.reporter.save_report(report_content)
